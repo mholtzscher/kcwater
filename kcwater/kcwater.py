@@ -1,4 +1,3 @@
-import json
 import aiohttp
 import asyncio
 from datetime import date, timedelta, datetime
@@ -120,13 +119,6 @@ class KCWater:
             self.hourly_usage_url, json=req_payload, headers=self.headers
         ) as response:
             usageData = await response.json()
-            if log_level == logging.DEBUG:
-                with open("hourly_output.json", "w") as outfile:
-                    json.dump(usageData, outfile, indent=4)
-                    logging.debug("Wrote data to output.json")
-                with open("hourly_secondary.json", "w") as outfile:
-                    json.dump(json.loads(usageData["jsonData"]), outfile, indent=4)
-                    logging.debug("Wrote data to secondary.json")
             return strip_future_data(usageData["history"])
 
     async def get_usage_daily(self, date=yesterday):
@@ -149,13 +141,6 @@ class KCWater:
             self.daily_usage_url, json=req_payload, headers=self.headers
         ) as response:
             usageData = await response.json()
-            if log_level == logging.DEBUG:
-                with open("daily_output.json", "w") as outfile:
-                    json.dump(usageData, outfile, indent=4)
-                    logging.debug("Wrote data to output.json")
-                with open("daily_secondary.json", "w") as outfile:
-                    json.dump(json.loads(usageData["jsonData"]), outfile, indent=4)
-                    logging.debug("Wrote data to secondary.json")
             return strip_future_data(usageData["history"])
 
 
