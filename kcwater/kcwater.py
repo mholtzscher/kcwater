@@ -4,6 +4,20 @@ from datetime import date, timedelta, datetime
 import logging
 from os import getenv
 
+from typing import List, Optional
+from dataclasses import dataclass
+
+
+@dataclass
+class Reading:
+    readDateTime: datetime
+    uom: str
+    meterNumber: Optional[str]
+    gallonsConsumption: str
+    rawConsumption: str
+    scaledRead: str
+    port: str
+
 
 log_level = logging.DEBUG
 logging.basicConfig(
@@ -98,11 +112,11 @@ class KCWater:
             and self.access_token is not None
         )
 
-    async def get_usage_hourly(self, date=today):
+    async def get_usage_hourly(self, date=today) -> Optional[List[Reading]]:
         """Fetches all usage data for a given date by hour."""
         if not self.loggedIn:
             logging.error("Must login first")
-            return
+            return None
         formatted_date = date.strftime("%d-%b-%Y")
         req_payload = {
             "customerId": str(self.customer_id),
@@ -119,29 +133,47 @@ class KCWater:
             self.hourly_usage_url, json=req_payload, headers=self.headers
         ) as response:
             usageData = await response.json()
-            return strip_future_data(usageData["history"])
+            readings: List[Reading] = []
+            for r in usageData["history"]:
+                readDate = datetime.strptime(
+                    f"{r['readDate']} {r['readDateTime']}", "%m-%d-%Y %I %p"
+                )
 
-    async def get_usage_daily(self, date=yesterday):
-        """Fetches all usage data from the given month by day."""
-        if not self.loggedIn:
-            logging.error("Must login first")
-            return
+                reading = Reading(
+                    readDateTime=readDate,
+                    uom=r["uom"],
+                    meterNumber=r["meterNumber"],
+                    rawConsumption=r["rawConsumption"],
+                    port=r["port"],
+                    gallonsConsumption=r["gallonsConsumption"],
+                    scaledRead=r["scaledRead"],
+                )
+                readings.append(reading)
 
-        formatted_date = date.strftime("%d-%b-%Y")
-        req_payload = {
-            "customerId": str(self.customer_id),
-            "accountContext": {
-                "accountNumber": str(self.account_number),
-                "serviceId": str(self.service_id),
-            },
-            "month": formatted_date,
-        }
+            return readings
 
-        async with self.session.post(
-            self.daily_usage_url, json=req_payload, headers=self.headers
-        ) as response:
-            usageData = await response.json()
-            return strip_future_data(usageData["history"])
+    # async def get_usage_daily(self, date=yesterday):
+    #     """Fetches all usage data from the given month by day."""
+    #     if not self.loggedIn:
+    #         logging.error("Must login first")
+    #         return
+    #
+    #     formatted_date = date.strftime("%d-%b-%Y")
+    #     req_payload = {
+    #         "customerId": str(self.customer_id),
+    #         "accountContext": {
+    #             "accountNumber": str(self.account_number),
+    #             "serviceId": str(self.service_id),
+    #         },
+    #         "month": formatted_date,
+    #     }
+    #
+    #     async with self.session.post(
+    #         self.daily_usage_url, json=req_payload, headers=self.headers
+    #     ) as response:
+    #         usageData = await response.json()
+    #         return DailyReadings(daily_readings=usageData["history"])
+    #         # return strip_future_data(usageData["history"])
 
 
 def getCreds():
@@ -169,24 +201,26 @@ if __name__ == "__main__":
 
         # Get a list of hourly readings
         hourly_data = await kc_water.get_usage_hourly()
+        logging.info("Hourly data: {}\n\n".format(hourly_data))
 
         # Get a list of hourly readings
-        daily_data = await kc_water.get_usage_daily()
+        # daily_data = await kc_water.get_usage_daily()
+        # logging.info("Daily data: {}\n\n".format(daily_data))
 
-        logging.info("Last daily data: {}\n\n".format(daily_data[-1]))
-        logging.info("Last hourly data: {}\n\n".format(hourly_data[-1]))
-        logging.info(
-            "Last daily reading: {} gal for {}".format(
-                daily_data[-1]["gallonsConsumption"], daily_data[-1]["readDate"]
-            )
-        )
-        logging.info(
-            "Last hourly reading: {} gal for {} {}".format(
-                hourly_data[-1]["gallonsConsumption"],
-                hourly_data[-1]["readDate"],
-                hourly_data[-1]["readDateTime"],
-            )
-        )
+        # logging.info("Last daily data: {}\n\n".format(daily_data[-1]))
+        # logging.info("Last hourly data: {}\n\n".format(hourly_data[-1]))
+        # logging.info(
+        #     "Last daily reading: {} gal for {}".format(
+        #         daily_data[-1]["gallonsConsumption"], daily_data[-1]["readDate"]
+        #     )
+        # )
+        # logging.info(
+        #     "Last hourly reading: {} gal for {} {}".format(
+        #         hourly_data[-1]["gallonsConsumption"],
+        #         hourly_data[-1]["readDate"],
+        #         hourly_data[-1]["readDateTime"],
+        #     )
+        # )
         await session.close()
 
     asyncio.run(sample())
